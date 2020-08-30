@@ -4,11 +4,17 @@ import os
 from dotenv import load_dotenv
 from discord.ext import commands
 from googlesearch import search
+from pymongo import MongoClient
 
 load_dotenv()
 TOKEN = os.getenv('DISCORD_TOKEN')
 
 bot = commands.Bot(command_prefix='!')
+
+# MongoDB(persistent storage) configurations
+client = MongoClient(os.getenv('MONGODB_URI'))
+db = client.search_history
+collection = db.search_strings
 
 
 @bot.event
@@ -30,9 +36,7 @@ async def google(ctx, *, name):
     """
     This method return the urls of the first five results of the google search with the given query string <name>
     """
-    f = open("storage.txt", "a+")
-    f.write(name + '\n')
-    f.close()
+    collection.insert_one({"search_string": name})
     for j in search(name, tld="com", num=5, stop=5, pause=2):
         await ctx.send(j)
 
@@ -42,11 +46,10 @@ async def recent(ctx, *, name):
     """
     This method returns the recent searches having the string <name> in it.
     """
-    f = open("storage.txt", "r")
-    query_strings = list(f)
-    for string in query_strings:
-        if name in string:
-            await ctx.send(string)
+    regex = '.*' + name + '.*'
+    my_query = {"search_string": {"$regex": regex}}
+    for x in collection.find(my_query):
+        await ctx.send(x['search_string'])
 
 
 @bot.event
